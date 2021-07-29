@@ -228,17 +228,18 @@ TimeSpan TimeSpan::operator+(const TimeSpan& right) {
 TimeSpan TimeSpan::operator-(const TimeSpan& right) {
   return TimeSpan(_seconds - right._seconds);
 }  // of overloaded subtract
-bool MCP7940_Class::begin(const uint32_t i2cSpeed) const {
+MCP7940_Class::MCP7940_Class(TwoWire *theWire) {
+  _wire = theWire;
+}
+bool MCP7940_Class::begin() const {
   /*!
       @brief     Start I2C device communications
       @details   Starts I2C comms with the device, using a default speed if one is not specified
       @param[in] i2cSpeed defaults to I2C_STANDARD_MODE, otherwise use speed in Herz
       @return    true if successfully started communication, otherwise false
   */
-  Wire.begin();                             // Start I2C as master device
-  Wire.setClock(i2cSpeed);                  // Set the I2C bus speed
-  Wire.beginTransmission(MCP7940_ADDRESS);  // Address the MCP7940
-  if (Wire.endTransmission() == 0)          // If there a device present
+  _wire->beginTransmission(MCP7940_ADDRESS);  // Address the MCP7940
+  if (_wire->endTransmission() == 0)          // If there a device present
   {
     clearRegisterBit(MCP7940_RTCHOUR, MCP7940_12_24);  // Use 24 hour clock
     setRegisterBit(MCP7940_CONTROL, MCP7940_ALMPOL);   // assert alarm low, default high

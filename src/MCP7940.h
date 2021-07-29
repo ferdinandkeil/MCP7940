@@ -98,6 +98,10 @@ Version| Date       | Developer           | Comments
 
 #include "Arduino.h"  // Arduino data type definitions
 #include "Wire.h"     // Standard I2C "Wire" library
+
+extern TwoWire Wire; /**< Forward declarations of Wire for board/variant
+                        combinations that don't have a default 'Wire' */
+
 #ifndef MCP7940_h
   /** @brief  Guard code definition */
   #define MCP7940_h  // Define the name inside guard code
@@ -108,12 +112,6 @@ class TimeSpan;
   /***************************************************************************************************
   ** Declare constants used in the class **
   ***************************************************************************************************/
-  #ifndef I2C_MODES  // I2C related constants
-    /** @brief Guard code definition */
-    #define I2C_MODES
-const uint32_t I2C_STANDARD_MODE{100000};  ///< Default normal I2C 100KHz speed
-const uint32_t I2C_FAST_MODE{400000};      ///< Fast mode
-  #endif
   #if !defined(BUFFER_LENGTH)  // The ESP32 Wire library doesn't currently define BUFFER_LENGTH
     /** @brief If the "Wire.h" library doesn't define the buffer, do so here */
     #define BUFFER_LENGTH 32
@@ -250,9 +248,9 @@ class MCP7940_Class {
    @brief Main class definition with forward declarations
   */
  public:
-  MCP7940_Class(){};   ///< Unused Class constructor
+  MCP7940_Class(TwoWire *theWire = &Wire);   ///< Unused Class constructor
   ~MCP7940_Class(){};  ///< Unused Class destructor
-  bool     begin(const uint32_t i2cSpeed = I2C_STANDARD_MODE) const;
+  bool     begin() const;
   bool     deviceStatus() const;
   bool     deviceStart() const;
   bool     deviceStop() const;
@@ -333,13 +331,13 @@ class MCP7940_Class {
      @return             Pointer to return data structure
     */
     uint8_t i{0};                                        // return number of bytes read
-    Wire.beginTransmission(MCP7940_EUI_ADDRESS);         // Address the special I2C address
-    Wire.write((addr % 8) + MCP7940_EUI_RAM_ADDRESS);    // Send register address to read from
-    if (Wire.endTransmission() == 0) {                   // Close transmission and check error code
-      Wire.requestFrom(MCP7940_EUI_ADDRESS, sizeof(T));  // Request a block of data, max 61 bits
+    _wire->beginTransmission(MCP7940_EUI_ADDRESS);         // Address the special I2C address
+    _wire->write((addr % 8) + MCP7940_EUI_RAM_ADDRESS);    // Send register address to read from
+    if (_wire->endTransmission() == 0) {                   // Close transmission and check error code
+      _wire->requestFrom(MCP7940_EUI_ADDRESS, sizeof(T));  // Request a block of data, max 61 bits
       uint8_t* bytePtr = (uint8_t*)&value;               // Declare pointer to start of structure
       for (i = 0; i < sizeof(T); i++) {                  // Loop for each byte to be read
-        *bytePtr++ = Wire.read();                        // Read a byte
+        *bytePtr++ = _wire->read();                        // Read a byte
       }                                                  // of for-next each byte
     }                                                    // if-then success
     return i;                                            // return number of bytes read
@@ -356,24 +354,25 @@ class MCP7940_Class {
      @return             Pointer to  data structure to write
     */
     uint8_t i{0};                                      // return number of bytes read
-    Wire.beginTransmission(MCP7940_EUI_ADDRESS);       // Address the special I2C address
-    Wire.write(MCP7940_EEUNLOCK);                      // Send special register address to write to
-    Wire.write(0x55);                                  // Special write value to start unlock
-    i = Wire.endTransmission();                        // close transmission of first byte
-    Wire.beginTransmission(MCP7940_EUI_ADDRESS);       // Address the special I2C address
-    Wire.write(MCP7940_EEUNLOCK);                      // Send special register address to write to
-    Wire.write(0x55);                                  // Special write value to complete unlock
-    i = Wire.endTransmission();                        // close transmission of second byte
-    Wire.beginTransmission(MCP7940_EUI_ADDRESS);       // Address the special I2C address
-    Wire.write((addr % 8) + MCP7940_EUI_RAM_ADDRESS);  // Send register address to read from
-    Wire.write((uint8_t*)&value, sizeof(T));           // write the data
-    i = Wire.endTransmission();                        // close transmission of actual write
+    _wire->beginTransmission(MCP7940_EUI_ADDRESS);       // Address the special I2C address
+    _wire->write(MCP7940_EEUNLOCK);                      // Send special register address to write to
+    _wire->write(0x55);                                  // Special write value to start unlock
+    i = _wire->endTransmission();                        // close transmission of first byte
+    _wire->beginTransmission(MCP7940_EUI_ADDRESS);       // Address the special I2C address
+    _wire->write(MCP7940_EEUNLOCK);                      // Send special register address to write to
+    _wire->write(0x55);                                  // Special write value to complete unlock
+    i = _wire->endTransmission();                        // close transmission of second byte
+    _wire->beginTransmission(MCP7940_EUI_ADDRESS);       // Address the special I2C address
+    _wire->write((addr % 8) + MCP7940_EUI_RAM_ADDRESS);  // Send register address to read from
+    _wire->write((uint8_t*)&value, sizeof(T));           // write the data
+    i = _wire->endTransmission();                        // close transmission of actual write
     if (i == 0) i = sizeof(T);                         // return number of bytes on success
     return i;                                          // return number of bytes read
   }                                                    // of method writeEUI()
 
  private:
   uint32_t _SetUnixTime{0};  ///< UNIX time when clock last set
+  TwoWire *_wire;            ///< Wire object
   /*************************************************************************************************
   ** Template functions definitions are done in the header file                                   **
   ** ============================================================================================ **
@@ -394,13 +393,13 @@ class MCP7940_Class {
     @return    number of bytes read
    */
     uint8_t i{0};                                    // return number of bytes read
-    Wire.beginTransmission(MCP7940_ADDRESS);         // Address the I2C device
-    Wire.write(address);                             // Send register address to read from
-    if (Wire.endTransmission() == 0) {               // Close transmission and check error code
-      Wire.requestFrom(MCP7940_ADDRESS, sizeof(T));  // Request a block of data
+    _wire->beginTransmission(MCP7940_ADDRESS);         // Address the I2C device
+    _wire->write(address);                             // Send register address to read from
+    if (_wire->endTransmission() == 0) {               // Close transmission and check error code
+      _wire->requestFrom(MCP7940_ADDRESS, sizeof(T));  // Request a block of data
       uint8_t* bytePtr = (uint8_t*)&value;           // Declare pointer to start of structure
       for (i = 0; i < sizeof(T); i++) {              // Loop for each byte to be read
-        *bytePtr++ = Wire.read();                    // Read a byte
+        *bytePtr++ = _wire->read();                    // Read a byte
       }                                              // of for-next each byte
     }                                                // if-then success
     return i;                                        // return number of bytes read
@@ -416,10 +415,10 @@ class MCP7940_Class {
       @param[in] value   Data Type "T" to write
       @return    number of bytes written
      */
-    Wire.beginTransmission(MCP7940_ADDRESS);   // Address the I2C device
-    Wire.write(address);                       // Send register address to read from
-    Wire.write((uint8_t*)&value, sizeof(T));   // write the data
-    uint8_t i = Wire.endTransmission();        // close transmission and save status
+    _wire->beginTransmission(MCP7940_ADDRESS);   // Address the I2C device
+    _wire->write(address);                       // Send register address to read from
+    _wire->write((uint8_t*)&value, sizeof(T));   // write the data
+    uint8_t i = _wire->endTransmission();        // close transmission and save status
     if (i == 0) i = sizeof(T);                 // return number of bytes on success
     return i;                                  // return the number of bytes written
   }                                            // end of template method "I2C_write()"
